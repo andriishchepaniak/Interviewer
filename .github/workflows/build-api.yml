@@ -10,7 +10,8 @@ on:
     branches: [ "main" ]
     paths:
       - 'InterviewerApi/**'
-
+  workflow_dispatch:
+    
 jobs:
   build:
     runs-on: ubuntu-latest
