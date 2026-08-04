@@ -10,6 +10,7 @@ on:
     branches: [ "main" ]
     paths:
       - 'Interviewer/**'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -25,7 +26,7 @@ jobs:
         dotnet-version: '10.0.x' # Update to match your version
 
     - name: Restore dependencies
-      run: dotnet restore ./Interviewer/Interviewer.csproj
+      run: dotnet restore ./Interviewer/Interviewer/Interviewer.csproj
 
     - name: Build Blazor
-      run: dotnet build ./Interviewer/Interviewer.csproj --no-restore --configuration Release
+      run: dotnet build ./Interviewer/Interviewer/Interviewer.csproj --no-restore --configuration Release
