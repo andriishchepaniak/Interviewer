@@ -1,0 +1,158 @@
+﻿@page "/new"
+@using Interviewer.Data.Models
+@using Interviewer.Services
+@using Interviewer.State
+@rendermode InteractiveServer
+
+@inject NavigationManager Nav
+@inject InterviewState State
+@inject IInterviewGeneratorService IntrviewService
+
+<PageTitle>New Interview</PageTitle>
+
+<div class="h-screen flex items-center justify-center bg-gray-100 p-4">
+
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-2xl animate-fade-in">
+
+        <h1 class="text-3xl font-bold text-gray-800 mb-8 text-center" tabindex="-1">
+            Нова співбесіда
+        </h1>
+
+        <form @onsubmit="StartInterview">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">
+                        Ім'я кандидата <span class="text-red-500">*</span>
+                    </label>
+                    <input @bind="candidateName"
+                           @bind:event="oninput"
+                           type="text"
+                           placeholder="напр. Іван Петренко"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                           required />
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">
+                        Позиція <span class="text-red-500">*</span>
+                    </label>
+                    <input @bind="position"
+                           @bind:event="oninput"
+                           type="text"
+                           placeholder="напр. Senior .NET Dev"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                           required />
+                </div>
+            </div>
+
+            <div class="mb-8">
+                <label class="block text-gray-700 text-sm font-bold mb-2">
+                    Текст резюме / CV
+                </label>
+                <textarea @bind="cvText"
+                          rows="5"
+                          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"></textarea>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-lg text-sm">
+                    <strong>Помилка:</strong> @errorMessage
+                </div>
+            }
+
+            <div class="flex flex-col gap-3">
+                <button type="submit" disabled="@(!IsFormValid || isLoading)" class="btn-primary flex justify-center items-center gap-2">
+                    @if (isLoading)
+                    {
+                        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Генеруємо план...</span>
+                    }
+                    else
+                    {
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z" clip-rule="evenodd" />
+                        </svg>
+                        <span>Згенерувати план</span>
+                    }
+                </button>
+
+                <button type="button" @onclick="StartManual" disabled="@(!IsFormValid || isLoading)" class="btn-secondary flex justify-center items-center gap-2">
+                    <span>Створити шаблон вручну</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@code {
+    private string candidateName = "";
+    private string position = "";
+    private string cvText = "";
+    private string? errorMessage = null;
+    private bool isLoading = false;
+
+    private bool IsFormValid => !string.IsNullOrWhiteSpace(candidateName) && !string.IsNullOrWhiteSpace(position);
+
+    protected override void OnInitialized()
+    {
+        // Якщо в стані лежить уже збережене інтерв'ю — починаємо нове, а не редагуємо старе.
+        // Інакше нова співбесіда успадкувала б Id, теми та оцінки попередньої.
+        if (State.IsPersisted)
+        {
+            State.Reset();
+        }
+
+        // Незбережену чернетку зберігаємо, щоб працювало повернення з /review на /new.
+        candidateName = State.Current.CandidateName;
+        position = State.Current.Position;
+        cvText = State.Current.CvText;
+    }
+
+    private void StartInterview()
+    {
+        if (!IsFormValid) return;
+
+        State.Current.CandidateName = candidateName;
+        State.Current.Position = position;
+        State.Current.CvText = cvText;
+
+        State.IsGeneratingRequested = true;
+
+        Nav.NavigateTo("/review");
+    }
+    
+    private void StartManual()
+    {
+        if (!IsFormValid || isLoading) return;
+
+        State.Current.CandidateName = candidateName;
+        State.Current.Position = position;
+        State.Current.CvText = cvText;
+
+        if (!State.Current.Topics.Any())
+        {
+            LoadMockData();
+        }
+
+        Nav.NavigateTo("/review");
+    }
+
+    private void LoadMockData()
+    {
+        State.Current.Topics = new List<Topic> {
+            new Topic { Id=1, Title="Architecture", Questions = new() {
+                new Question { Text="Explain the CQRS pattern. When is it overkill?", Hint="Separation of Read/Write, Event Sourcing synergy, Overkill for simple CRUD." },
+                new Question { Text="How do you handle distributed transactions in Microservices?", Hint="Saga pattern, 2PC (mention why it's bad), Outbox pattern." }
+            }},
+            new Topic { Id=2, Title=".NET Core", Questions = new() {
+                new Question { Text="What is the difference between Task and ValueTask?", Hint="ValueTask avoids heap allocation for synchronous completion." },
+                new Question { Text="Explain Garbage Collection generations.", Hint="Gen 0 (short-lived), Gen 1 (buffer), Gen 2 (long-lived/LOH)." }
+            }}
+        };
+    }
+}

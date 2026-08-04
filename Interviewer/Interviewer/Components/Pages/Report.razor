@@ -1,0 +1,403 @@
+﻿@page "/report/{Id}"
+@using Interviewer.Data.Interfaces
+@using Interviewer.Data.Models
+@using Interviewer.Mappers
+@using Interviewer.Services
+@using Interviewer.State
+@using Markdig
+@rendermode InteractiveServer
+@inject NavigationManager Nav
+@inject InterviewState State
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject IInterviewGeneratorService Generator
+@inject IInterviewRepository Repository
+
+<div class="min-h-screen bg-gray-50 p-6 md:p-12">
+    <div class="max-w-6xl mx-auto">
+
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Результати співбесіди</h1>
+                <p class="text-gray-500 mt-1">Кандидат: <span class="font-medium text-gray-800">@State.Current.CandidateName</span> | Позиція: @State.Current.Position</p>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button @onclick="BackToInterview" class="btn-secondary flex items-center gap-2">
+                    ← Назад до інтерв'ю
+                </button>
+
+                <a href="/" class="btn-primary">
+                    Нова співбесіда
+                </a>
+            </div>
+        </div>
+
+        <div class="flex border-b border-gray-200 mb-8">
+            <button @onclick="() => activeTab = Tab.Analytics"
+                    class="pb-3 px-6 text-sm font-bold border-b-2 transition-colors @(activeTab == Tab.Analytics ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700")">
+                📊 Аналітика (Дані)
+            </button>
+            <button @onclick="() => activeTab = Tab.AIReport"
+                    class="pb-3 px-6 text-sm font-bold border-b-2 transition-colors @(activeTab == Tab.AIReport ? "border-purple-600 text-purple-600" : "border-transparent text-gray-500 hover:text-gray-700")">
+                ✨ AI Рев'ю
+            </button>
+        </div>
+
+        @if (activeTab == Tab.Analytics)
+        {
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in-up">
+
+                <div class="lg:col-span-2 space-y-6">
+
+                    <div class="p-6 rounded-xl border-l-4 shadow-sm bg-white @GetVerdictBorderClass(AverageScore)">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h3 class="font-bold text-gray-400 uppercase tracking-wider text-xs mb-1">Оцінка системи</h3>
+                                <p class="text-3xl font-bold text-gray-900">@GetRecommendation(AverageScore)</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-4xl font-extrabold @GetVerdictTextClass(AverageScore)">@AverageScore.ToString("F1")</p>
+                                <p class="text-xs text-gray-500 font-medium mt-1">з 3.0 максимум</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                            <h3 class="font-bold text-gray-800 text-lg mb-4 flex items-center gap-2">
+                                <span class="text-green-500">📈</span> Сильні сторони
+                            </h3>
+                            @if (Strengths.Any())
+                            {
+                                <ul class="space-y-3">
+                                    @* @foreach (var q in Strengths.Take(4)) *@
+                                    @foreach (var q in Strengths)
+                                    {
+                                        <li class="text-sm text-gray-700 flex items-start gap-2">
+                                            <span class="text-green-500 mt-0.5">✓</span>
+                                            <span>@q.Text <span class="text-gray-400 text-xs ml-1">(@q.Score б.)</span></span>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                            else
+                            {
+                                <p class="text-sm text-gray-400 italic">Не виявлено яскраво виражених сильних сторін.</p>
+                            }
+                        </div>
+
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                            <h3 class="font-bold text-gray-800 text-lg mb-4 flex items-center gap-2">
+                                <span class="text-red-500">📉</span> Зони для покращення
+                            </h3>
+                            @if (Weaknesses.Any())
+                            {
+                                <ul class="space-y-3">
+                                   @*  @foreach (var q in Weaknesses.Take(4)) *@
+                                    @foreach (var q in Weaknesses)
+                                    {
+                                        <li class="text-sm text-gray-700 flex items-start gap-2">
+                                            <span class="text-red-400 mt-0.5">✗</span>
+                                            <span>@q.Text <span class="text-gray-400 text-xs ml-1">(@q.Score б.)</span></span>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                            else
+                            {
+                                <p class="text-sm text-gray-400 italic">Критичних прогалин не виявлено.</p>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                        <h3 class="font-bold text-gray-800 text-lg mb-6">Аналіз по компетенціях</h3>
+
+                        <div class="space-y-5">
+                            @foreach (var stat in TopicStats)
+                            {
+                                <div>
+                                    <div class="flex justify-between mb-1.5 items-end">
+                                        <span class="text-sm font-bold text-gray-700">@stat.TopicName</span>
+                                        <span class="text-sm font-bold @GetVerdictTextClass(stat.Avg)">@stat.Avg.ToString("F1") / 3</span>
+                                    </div>
+                                    <div class="w-full bg-gray-100 rounded-full h-3 overflow-hidden border border-gray-200">
+                                        <div class="h-full rounded-full transition-all duration-1000 @GetBarColorClass(stat.Avg)" style="width: @(stat.Avg / 3.0 * 100)%"></div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-1">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 sticky top-6">
+                        <h3 class="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wider">Швидкий фідбек (Email)</h3>
+                        <textarea class="w-full h-96 bg-gray-50 p-4 rounded-lg text-xs text-gray-700 font-mono border border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none outline-none" readonly>@GenerateEmail()</textarea>
+                        <button @onclick="CopyToClipboard" class="w-full mt-4 bg-gray-800 hover:bg-black text-white py-2.5 rounded-lg font-medium transition text-sm">
+                            📋 Копіювати текст
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (activeTab == Tab.AIReport)
+        {
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 md:p-12 min-h-[500px] animate-fade-in">
+
+                @if (string.IsNullOrEmpty(aiReportMarkdown))
+                {
+                    <div class="text-center py-20">
+                        <div class="text-6xl mb-4">🤖</div>
+                        <h3 class="text-xl font-bold text-gray-800 mb-2">Генерація розумного звіту</h3>
+                        <p class="text-gray-500 mb-8 max-w-md mx-auto">AI проаналізує кожну оцінку та ваш коментар, щоб скласти професійне Summary співбесіди.</p>
+
+                        <button @onclick="GenerateAIReport" disabled="@isGeneratingReport" class="px-8 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center gap-2 mx-auto">
+                            @if (isGeneratingReport)
+                            {
+                                <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>Пишемо звіт...</span>
+                            }
+                            else
+                            {
+                                <span>✨ Згенерувати AI Summary</span>
+                            }
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="prose prose-blue max-w-none">
+                        @((MarkupString)aiReportHtml)
+                    </div>
+
+                    <div class="mt-12 pt-6 border-t border-gray-100 flex justify-end">
+                        <button class="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition" @onclick="ResetReport">
+                            Скинути та перегенерувати
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .prose h3 {
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin-top: 1.5rem;
+        margin-bottom: 0.75rem;
+        color: #1f2937;
+    }
+
+    .prose p {
+        margin-bottom: 1rem;
+        color: #4b5563;
+        line-height: 1.6;
+    }
+
+    .prose ul {
+        list-style-type: disc;
+        padding-left: 1.5rem;
+        margin-bottom: 1rem;
+        color: #4b5563;
+    }
+
+    .prose li {
+        margin-bottom: 0.25rem;
+    }
+
+    .prose strong {
+        color: #111827;
+        font-weight: 600;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string Id { get; set; }
+
+    enum Tab { Analytics, AIReport }
+    private Tab activeTab = Tab.Analytics;
+
+    // Стан для AI звіту
+    private bool isGeneratingReport = false;
+    private string aiReportMarkdown = string.Empty;
+    private string aiReportHtml = string.Empty;
+
+    private static readonly MarkdownPipeline pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(Id) && State.Current.Id != Id)
+        {
+            var interviewFromDb = await Repository.GetByIdAsync(Id);
+            if (interviewFromDb == null) { Nav.NavigateTo("/"); return; }
+            State.Current = interviewFromDb;
+        }
+
+        // /report/{Id} завжди показує вже збережене інтерв'ю.
+        State.IsPersisted = true;
+    }
+
+    private void BackToInterview() => Nav.NavigateTo($"/interview/{Id}");
+
+    // Скидаємо ОБИДВА поля: гейт видимості дивиться на markdown, а рендериться html.
+    // Якщо очистити лише html, панель залишиться назавжди порожньою без кнопки генерації.
+    private void ResetReport()
+    {
+        aiReportMarkdown = string.Empty;
+        aiReportHtml = string.Empty;
+    }
+
+    // === Логіка Аналітики ===
+    private List<Question> ValidQuestions => State.Current.Topics.SelectMany(t => t.Questions).Where(q => q.Score >= 0).ToList();
+    private int AnsweredCount => ValidQuestions.Count;
+    private double AverageScore => AnsweredCount == 0 ? 0 : ValidQuestions.Average(q => q.Score!.Value);
+
+    // Розумний пошук сильних і слабких сторін
+    private List<Question> Strengths => ValidQuestions.Where(q => q.Score >= 2).OrderByDescending(q => q.Score).ToList();
+    private List<Question> Weaknesses => ValidQuestions.Where(q => q.Score <= 1).OrderBy(q => q.Score).ToList();
+
+    private List<TopicStat> TopicStats => State.Current.Topics
+        .Where(t => t.Questions.Any(q => q.Score >= 0))
+        .Select(t => new TopicStat
+        {
+            TopicName = t.Title,
+            Avg = t.Questions.Where(q => q.Score >= 0).Average(q => q.Score!.Value)
+        })
+        .OrderByDescending(t => t.Avg).ToList();
+
+    class TopicStat { public string TopicName { get; set; } = ""; public double Avg { get; set; } }
+
+    // === Дії ===
+
+    private async Task GenerateAIReport()
+    {
+        isGeneratingReport = true;
+        StateHasChanged();
+
+        try
+        {
+            // await foreach (var chunk in Generator.GenerateFeedbackAsync(State.ToInterview()))
+            // {
+            //     // Accumulate raw Markdown
+            //     aiReportMarkdown += chunk;
+
+            //     // Convert to HTML on the fly
+            //     aiReportHtml = Markdown.ToHtml(aiReportMarkdown, pipeline);
+
+            //     StateHasChanged();
+            // }
+            var request = new HttpRequestMessage(HttpMethod.Post, "https://localhost:7254/api/interviews/feedback/stream")
+            {
+                Content = JsonContent.Create(State.ToInterview())
+            };
+
+            // 2. CRITICAL: Use ResponseHeadersRead so it doesn't buffer the whole response
+            using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            if (!response.IsSuccessStatusCode)
+            {
+                // Read the actual error from the server body
+                var errorText = await response.Content.ReadAsStringAsync();
+                throw new Exception($"HTTP {response.StatusCode}: {errorText}");
+            }
+            response.EnsureSuccessStatusCode();
+
+            // 3. Read the stream as it arrives
+            using var stream = await response.Content.ReadAsStreamAsync();
+            using var reader = new StreamReader(stream);
+
+            // Read in small chunks (e.g., 64 characters at a time) to create the typing effect
+            char[] buffer = new char[64];
+            int charsRead;
+
+            while ((charsRead = await reader.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            {
+                // Extract just the characters we read in this pass
+                var chunk = new string(buffer, 0, charsRead);
+
+                aiReportMarkdown += chunk;
+                aiReportHtml = Markdown.ToHtml(aiReportMarkdown, pipeline);
+
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            aiReportHtml = $"<p class='text-red-500'>Помилка генерації: {ex.Message}</p>";
+        }
+        finally
+        {
+            isGeneratingReport = false;
+        }
+    }
+
+    private async Task CopyToClipboard()
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", GenerateEmail());
+    }
+
+    // === UI Хелпери ===
+
+    string GetRecommendation(double score) => score switch
+    {
+        >= 2.5 => "Strong Hire",
+        >= 2.0 => "Hire",
+        >= 1.5 => "Maybe / Weak",
+        _ => "No Hire"
+    };
+
+    string GetVerdictBorderClass(double score) => score switch
+    {
+        >= 2.0 => "border-green-500",
+        >= 1.5 => "border-orange-400",
+        _ => "border-red-500"
+    };
+
+    string GetVerdictTextClass(double score) => score switch
+    {
+        >= 2.0 => "text-green-600",
+        >= 1.5 => "text-orange-500",
+        _ => "text-red-600"
+    };
+
+    string GetBarColorClass(double score) => score switch
+    {
+        >= 2.5 => "bg-green-500",
+        >= 2.0 => "bg-green-400",
+        >= 1.5 => "bg-orange-400",
+        _ => "bg-red-500"
+    };
+
+    string GenerateEmail()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Subject: Фідбек - {State.Current.CandidateName} ({State.Current.Position})");
+        sb.AppendLine();
+        sb.AppendLine($"Вердикт: {GetRecommendation(AverageScore)}");
+        sb.AppendLine($"Загальний бал: {AverageScore:F1}/3.0");
+        sb.AppendLine();
+        sb.AppendLine("Результати по компетенціях:");
+        foreach (var t in TopicStats) sb.AppendLine($"- {t.TopicName}: {t.Avg:F1}/3");
+
+        if (Strengths.Any() || Weaknesses.Any()) sb.AppendLine();
+
+        if (Strengths.Any())
+        {
+            sb.AppendLine("Плюси:");
+            foreach (var q in Strengths) sb.AppendLine($"+ {q.Text}");
+        }
+        if (Weaknesses.Any())
+        {
+            sb.AppendLine("Мінуси:");
+            foreach (var q in Weaknesses) sb.AppendLine($"- {q.Text}");
+        }
+        return sb.ToString();
+    }
+}

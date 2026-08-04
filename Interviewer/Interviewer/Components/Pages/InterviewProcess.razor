@@ -1,0 +1,238 @@
+﻿@page "/interview/{Id}"
+@using Interviewer.Data.Interfaces
+@using Interviewer.Data.Models
+@using Interviewer.State
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+@inject InterviewState State
+@inject IInterviewRepository Repository
+
+<div class="flex flex-col h-screen bg-gray-50">
+    <header class="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center shadow-sm z-20">
+        <div class="flex items-center gap-3">
+            <button @onclick="BackToReview" class="btn-secondary" title="Повернутися до редагування питань">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                </svg>
+            </button>
+
+            <div>
+                <h2 class="text-lg font-bold text-gray-800">Інтерв'ю: @State.Current.Position</h2>
+                <div class="text-xs text-gray-500">Кандидат: <span class="font-medium text-gray-700">@State.Current.CandidateName</span></div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="hidden md:flex flex-col items-end mr-4">
+                <span class="text-xs text-gray-400 font-medium">Прогрес: @Progress%</span>
+                <div class="w-32 h-1.5 bg-gray-100 rounded-full mt-1 overflow-hidden">
+                    <div class="h-full bg-green-500 transition-all duration-500" style="width: @Progress%"></div>
+                </div>
+            </div>
+
+            <button @onclick="FinishInterview" class="btn-primary">
+                Переглянути результати →
+            </button>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+
+        <aside class="w-72 bg-white border-r border-gray-200 flex flex-col z-10">
+            <div class="p-4 border-b border-gray-100">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Теми інтерв'ю</h3>
+            </div>
+
+            <nav class="flex-1 overflow-y-auto p-3 space-y-1">
+                @foreach (var topic in State.Current.Topics)
+                {
+                    <button @onclick="() => SelectTopic(topic)"
+                            class="w-full text-left px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 flex justify-between items-center gap-2
+                                    @(selectedTopic == topic ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200 shadow-sm" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900")">
+
+                        <span class="truncate">@topic.Title</span>
+
+                        @if (topic.Questions.Any(q => q.Score.HasValue))
+                        {
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500 shrink-0 whitespace-nowrap">
+                                @topic.Questions.Count(q => q.Score.HasValue) / @topic.Questions.Count
+                            </span>
+                        }
+                    </button>
+                }
+            </nav>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto bg-gray-50 p-6 lg:p-8 relative">
+
+            <div class="max-w-4xl pb-24">
+
+                @if (selectedTopic != null)
+                {
+                    <div class="animate-fade-in">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-6">@selectedTopic.Title</h2>
+
+                        <div class="space-y-4">
+                            @foreach (var q in selectedTopic.Questions)
+                            {
+                                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden transition-all duration-300
+                                                     @(q.Score == -1 ? "bg-gray-50 border-dashed border-gray-300 opacity-60 grayscale" : "hover:shadow-md")">
+
+                                    <div class="p-4 flex flex-col lg:flex-row gap-6 lg:items-center justify-between">
+
+                                        <div class="flex-1">
+                                            <h4 class="text-base font-medium transition-colors @(q.Score == -1 ? "text-gray-500 line-through decoration-gray-400" : "text-gray-900")">
+                                                @q.Text
+                                            </h4>
+                                            @if (q.Score != -1 && !string.IsNullOrEmpty(q.Hint))
+                                            {
+                                                <div class="mt-1 text-xs text-gray-500 flex items-start gap-1.5">
+                                                    <span class="text-blue-500">💡</span> @q.Hint
+                                                </div>
+                                            }
+                                        </div>
+
+                                        <div class="flex flex-wrap items-center gap-1 shrink-0">
+                                            <button @onclick="() => SetScore(q, -1)" title="Пропустити"
+                                                    class="mr-2 w-7 h-7 rounded-full flex items-center justify-center transition-all border
+                                                                @(q.Score == -1 ? "bg-gray-400 text-white border-gray-400" : "bg-gray-50 text-gray-400 border-gray-200 hover:border-gray-400 hover:text-gray-600")">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                                </svg>
+                                            </button>
+
+                                            <div class="w-px h-5 bg-gray-200 mx-1"></div>
+
+                                            @foreach (var score in new[] { 0, 1, 2, 3 })
+                                            {
+                                                <button @onclick="() => SetScore(q, score)"
+                                                        class="px-2.5 py-1 rounded text-xs font-bold border transition-all
+                                                                            @(GetScoreButtonClass(q.Score, score))">
+                                                    @GetScoreLabel(score)
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    @if (q.Score != -1)
+                                    {
+                                        <div class="px-4 pb-4 pt-1">
+                                            <input @bind="q.Comment"
+                                                   @onblur="SaveChanges"
+                                                   type="text" 
+                                                   placeholder="📝 Додати нотатку до відповіді (опційно)..."
+                                                   class="w-full text-sm bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-700 placeholder-gray-400 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <div class="flex justify-between items-center mt-10 pt-6 border-t border-gray-200">
+                            <button @onclick="PrevTopic" disabled="@IsFirstTopic" class="btn-secondary">← Попередня тема</button>
+
+                            @if (IsLastTopic)
+                            {
+                                <button @onclick="FinishInterview" class="btn-primary flex items-center gap-2">
+                                    Переглянути результати →
+                                </button>
+                            }
+                            else
+                            {
+                                <button @onclick="NextTopic" class="btn-secondary">Наступна тема →</button>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </main>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Id { get; set; }
+
+    private Topic? selectedTopic;
+    private bool IsFirstTopic => selectedTopic == State.Current.Topics.FirstOrDefault();
+    private bool IsLastTopic => selectedTopic == State.Current.Topics.LastOrDefault();
+
+    private int Progress
+    {
+        get
+        {
+            var totalQ = State.Current.Topics.Sum(t => t.Questions.Count);
+            if (totalQ == 0) return 0;
+            var answeredQ = State.Current.Topics.Sum(t => t.Questions.Count(q => q.Score.HasValue));
+            return (int)((double)answeredQ / totalQ * 100);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(Id) && State.Current.Id != Id)
+        {
+            var interviewFromDb = await Repository.GetByIdAsync(Id);
+            if (interviewFromDb == null)
+            {
+                Nav.NavigateTo("/");
+                return;
+            }
+
+            State.Current = interviewFromDb;
+        }
+
+        // /interview/{Id} завжди показує вже збережене інтерв'ю.
+        State.IsPersisted = true;
+
+        selectedTopic = State.Current.Topics.FirstOrDefault();
+    }
+
+    void SelectTopic(Topic t) => selectedTopic = t;
+
+    void BackToReview() => Nav.NavigateTo($"/review/{Id}");
+
+    void NextTopic()
+    {
+        var idx = State.Current.Topics.IndexOf(selectedTopic!);
+        if (idx < State.Current.Topics.Count - 1) selectedTopic = State.Current.Topics[idx + 1];
+    }
+
+    void PrevTopic()
+    {
+        var idx = State.Current.Topics.IndexOf(selectedTopic!);
+        if (idx > 0) selectedTopic = State.Current.Topics[idx - 1];
+    }
+
+    void FinishInterview() => Nav.NavigateTo($"/report/{Id}");
+
+    async Task SetScore(Question q, int score)
+    {
+        q.Score = (q.Score == score) ? null : score;
+
+        await Repository.UpdateAsync(State.Current.Id, State.Current);
+    }
+
+    async Task SaveChanges()
+    {
+        await Repository.UpdateAsync(State.Current.Id, State.Current);
+    }
+
+    string GetScoreLabel(int score) => score switch { 0 => "Wrong (0)", 1 => "Weak (1)", 2 => "Good (2)", 3 => "Excellent (3)", _ => "" };
+
+    string GetScoreButtonClass(int? currentScore, int btnScore)
+    {
+        if (currentScore == btnScore)
+        {
+            return btnScore switch
+            {
+                0 => "bg-red-100 border-red-300 text-red-800 shadow-inner",
+                1 => "bg-orange-100 border-orange-300 text-orange-800 shadow-inner",
+                2 => "bg-green-100 border-green-300 text-green-800 shadow-inner",
+                3 => "bg-blue-100 border-blue-300 text-blue-800 shadow-inner",
+                _ => ""
+            };
+        }
+        return "bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 hover:bg-gray-50";
+    }
+}
