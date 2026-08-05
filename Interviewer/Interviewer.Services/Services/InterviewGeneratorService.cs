@@ -1,4 +1,4 @@
-﻿using Interviewer.Data.Models;
+﻿using Interviewer.Contracts.Models;
 using Interviewer.Infrastructure.Interfaces;
 using Interviewer.Services.Options;
 using Microsoft.Extensions.Options;
@@ -17,7 +17,7 @@ public class InterviewGeneratorService : IInterviewGeneratorService
         _promptOptions = promptOptions.Value;
     }
 
-    public async Task<List<Topic>> GenerateInterviewPlanAsync(string position, string cvText)
+    public async Task<Topic[]> GenerateInterviewPlanAsync(string position, string cvText)
     {
         string basePath = AppDomain.CurrentDomain.BaseDirectory;
         string fullPath = Path.Combine(basePath, _promptOptions.InterviewPlanPath);
@@ -38,18 +38,18 @@ public class InterviewGeneratorService : IInterviewGeneratorService
         string rawResponse = await _aiService.GenerateTextAsync(prompt);
 
         if (string.IsNullOrWhiteSpace(rawResponse))
-            return new List<Topic>();
+            return [];
 
         string cleanJson = CleanJson(rawResponse);
 
         try
         {
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var topics = JsonSerializer.Deserialize<List<Topic>>(cleanJson, options);
+            var topics = JsonSerializer.Deserialize<Topic[]>(cleanJson, options);
 
             if (topics != null)
             {
-                for (int i = 0; i < topics.Count; i++) topics[i].Id = i + 1;
+                for (int i = 0; i < topics.Length; i++) topics[i].Id = i + 1;
                 return topics;
             }
         }
@@ -58,7 +58,7 @@ public class InterviewGeneratorService : IInterviewGeneratorService
             Console.WriteLine($"JSON Parsing Error: {ex.Message}");
         }
 
-        return new List<Topic>();
+        return [];
     }
 
     public async IAsyncEnumerable<string> GenerateFeedbackAsync(Interview interview)

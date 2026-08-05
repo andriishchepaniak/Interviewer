@@ -3,12 +3,8 @@ name: Build API (InterviewerApi)
 on:
   push:
     branches: [ "main" ]
-    paths:
-      - 'InterviewerApi/**'
   pull_request:
     branches: [ "main" ]
-    paths:
-      - 'InterviewerApi/**'
   workflow_dispatch:
 
 jobs:

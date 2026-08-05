@@ -4,7 +4,9 @@ using Interviewer.Data.Settings;
 using Interviewer.Infrastructure.Gemini;
 using Interviewer.Infrastructure.Interfaces;
 using Interviewer.Services;
+using Interviewer.Services.Interfaces;
 using Interviewer.Services.Options;
+using Interviewer.Services.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +21,7 @@ builder.Services.AddScoped<IInterviewRepository, MongoInterviewRepository>();
 builder.Services.AddScoped<IAIService, GeminiAIService>();
 
 builder.Services.AddScoped<IInterviewGeneratorService, InterviewGeneratorService>();
+builder.Services.AddScoped<IInterviewService, InterviewService>();
 
 builder.Services.AddCors(options =>
 {

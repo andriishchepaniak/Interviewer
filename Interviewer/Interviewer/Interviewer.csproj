@@ -17,8 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Interviewer.Data\Interviewer.Data.csproj" />
-    <ProjectReference Include="..\Interviewer.Infrastructure\Interviewer.Infrastructure.csproj" />
-    <ProjectReference Include="..\Interviewer.Services\Interviewer.Services.csproj" />
+    <ProjectReference Include="..\Contracts\Interviewer.Contracts.csproj" />
   </ItemGroup>
 </Project>

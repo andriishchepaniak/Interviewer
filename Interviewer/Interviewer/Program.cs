@@ -1,37 +1,21 @@
+using Interviewer.Clients;
 using Interviewer.Components;
-using Interviewer.Data.Interfaces;
-using Interviewer.Data.Repositories;
-using Interviewer.Data.Settings;
-using Interviewer.Infrastructure.Gemini;
-using Interviewer.Infrastructure.Interfaces;
-using Interviewer.Services;
-using Interviewer.Services.Options;
 using Interviewer.State;
-using Microsoft.AspNetCore.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.Configure<PromptOptions>(builder.Configuration.GetSection(PromptOptions.SectionName));
-
-builder.Services.Configure<MongoDbSettings>(
-    builder.Configuration.GetSection("MongoDb"));
-
-builder.Services.AddSingleton<IInterviewRepository, MongoInterviewRepository>();
-
-builder.Services.AddScoped(sp =>
+builder.Services.AddHttpClient("InterviewApi", client =>
 {
-    return new HttpClient();
-    //{
-    //    BaseAddress = new Uri("https://localhost:7254/")
-    //};
+    client.BaseAddress = new Uri("https://localhost:7254/");
 });
+
+builder.Services.AddScoped<InterviewClientService>();
+
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddSingleton<InterviewState>();
-builder.Services.AddScoped<IAIService, GeminiAIService>();
-builder.Services.AddScoped<IInterviewGeneratorService, InterviewGeneratorService>();
 
 var app = builder.Build();
 

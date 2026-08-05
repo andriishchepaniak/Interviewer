@@ -3,12 +3,8 @@ name: Build Blazor (Interviewer)
 on:
   push:
     branches: [ "main" ]
-    paths:
-      - 'Interviewer/**'
   pull_request:
     branches: [ "main" ]
-    paths:
-      - 'Interviewer/**'
   workflow_dispatch:
 
 jobs:

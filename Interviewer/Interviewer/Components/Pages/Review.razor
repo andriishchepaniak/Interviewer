@@ -1,14 +1,13 @@
 ﻿@page "/review"
 @page "/review/{Id}"
-@using Interviewer.Data.Interfaces
-@using Interviewer.Data.Models
-@using Interviewer.Services
 @using Interviewer.State
+@using Interviewer.Clients
+@using Interviewer.Contracts.Models
+@using Interviewer.Contracts.Requests
 @rendermode InteractiveServer
 @inject NavigationManager Nav
 @inject InterviewState State
-@inject IInterviewGeneratorService Generator
-@inject IInterviewRepository Repository
+@inject InterviewClientService InterviewClient
 
 
 <div class="min-h-screen bg-white flex flex-col">
@@ -165,7 +164,7 @@
         {
             if (State.Current.Id != Id)
             {
-                var interviewFromDb = await Repository.GetByIdAsync(Id);
+                var interviewFromDb = await InterviewClient.GetByIdAsync(Id);
                 if (interviewFromDb == null)
                 {
                     Nav.NavigateTo("/");
@@ -198,11 +197,22 @@
 
             try
             {
-                var generatedTopics = await Generator.GenerateInterviewPlanAsync(State.Current.Position, State.Current.CvText);
+                var generatedTopics = await InterviewClient.GeneratePlanAsync(new InterviewRequest(State.Current.Position, State.Current.CvText));
 
                 if (generatedTopics != null && generatedTopics.Any())
                 {
-                    State.Current.Topics = generatedTopics;
+                    State.Current.Topics = generatedTopics.Select(t => new Topic
+                    {
+                        Id = t.Id,
+                        Title = t.Title,
+                        Questions = t.Questions.Select(q => new Question
+                        {
+                            Text = q.Text,
+                            Hint = q.Hint,
+                            Score = q.Score,
+                            Comment = q.Comment
+                        }).ToList()
+                    }).ToList();
                 }
             }
             catch (Exception ex)
@@ -252,11 +262,11 @@
         {
             if (State.IsPersisted)
             {
-                await Repository.UpdateAsync(State.Current.Id, State.Current);
+                await InterviewClient.UpdateAsync(State.Current.Id, State.Current);
             }
             else
             {
-                await Repository.CreateAsync(State.Current);
+                await InterviewClient.CreateAsync(State.Current);
                 State.IsPersisted = true;
             }
         }
