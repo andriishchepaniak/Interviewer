@@ -39,7 +39,6 @@ jobs:
       run: dotnet publish ./Interviewer/Interviewer/Interviewer.csproj --no-build --configuration Release --output ./publish
 
     - name: Deploy to Azure Static Web Apps
-      if: github.ref == 'refs/heads/main'
       uses: Azure/static-web-apps-deploy@v1
       with:
         azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_TOKEN }}
