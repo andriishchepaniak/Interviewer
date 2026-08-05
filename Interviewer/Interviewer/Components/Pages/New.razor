@@ -1,12 +1,12 @@
 ﻿@page "/new"
-@using Interviewer.Data.Models
-@using Interviewer.Services
 @using Interviewer.State
+@using Interviewer.Clients
+@using Interviewer.Contracts.Models
 @rendermode InteractiveServer
 
 @inject NavigationManager Nav
 @inject InterviewState State
-@inject IInterviewGeneratorService IntrviewService
+@inject InterviewClientService IntrviewService
 
 <PageTitle>New Interview</PageTitle>
 

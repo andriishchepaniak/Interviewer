@@ -1,17 +1,14 @@
 ﻿@page "/report/{Id}"
-@using Interviewer.Data.Interfaces
-@using Interviewer.Data.Models
-@using Interviewer.Mappers
-@using Interviewer.Services
 @using Interviewer.State
+@using Interviewer.Clients
+@using Interviewer.Contracts.Models
 @using Markdig
 @rendermode InteractiveServer
 @inject NavigationManager Nav
 @inject InterviewState State
 @inject HttpClient Http
 @inject IJSRuntime JS
-@inject IInterviewGeneratorService Generator
-@inject IInterviewRepository Repository
+@inject InterviewClientService InterviewClient
 
 <div class="min-h-screen bg-gray-50 p-6 md:p-12">
     <div class="max-w-6xl mx-auto">
@@ -236,9 +233,7 @@
     {
         if (!string.IsNullOrEmpty(Id) && State.Current.Id != Id)
         {
-            var interviewFromDb = await Repository.GetByIdAsync(Id);
-            if (interviewFromDb == null) { Nav.NavigateTo("/"); return; }
-            State.Current = interviewFromDb;
+                var interviewFromDb = await InterviewClient.GetByIdAsync(Id);
         }
 
         // /report/{Id} завжди показує вже збережене інтерв'ю.
@@ -284,47 +279,17 @@
 
         try
         {
-            // await foreach (var chunk in Generator.GenerateFeedbackAsync(State.ToInterview()))
-            // {
-            //     // Accumulate raw Markdown
-            //     aiReportMarkdown += chunk;
-
-            //     // Convert to HTML on the fly
-            //     aiReportHtml = Markdown.ToHtml(aiReportMarkdown, pipeline);
-
-            //     StateHasChanged();
-            // }
-            var request = new HttpRequestMessage(HttpMethod.Post, "https://localhost:7254/api/interviews/feedback/stream")
+            // Assuming your service is injected as ClientService
+            // e.g., @inject InterviewClientService ClientService at the top of your Razor file
+            await foreach (var chunk in InterviewClient.StreamFeedbackAsync(State.Current))
             {
-                Content = JsonContent.Create(State.ToInterview())
-            };
-
-            // 2. CRITICAL: Use ResponseHeadersRead so it doesn't buffer the whole response
-            using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-            if (!response.IsSuccessStatusCode)
-            {
-                // Read the actual error from the server body
-                var errorText = await response.Content.ReadAsStringAsync();
-                throw new Exception($"HTTP {response.StatusCode}: {errorText}");
-            }
-            response.EnsureSuccessStatusCode();
-
-            // 3. Read the stream as it arrives
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var reader = new StreamReader(stream);
-
-            // Read in small chunks (e.g., 64 characters at a time) to create the typing effect
-            char[] buffer = new char[64];
-            int charsRead;
-
-            while ((charsRead = await reader.ReadAsync(buffer, 0, buffer.Length)) > 0)
-            {
-                // Extract just the characters we read in this pass
-                var chunk = new string(buffer, 0, charsRead);
-
+                // Accumulate raw Markdown from the stream
                 aiReportMarkdown += chunk;
+
+                // Convert to HTML on the fly using Markdig
                 aiReportHtml = Markdown.ToHtml(aiReportMarkdown, pipeline);
 
+                // Tell Blazor to re-render the UI with the new text
                 StateHasChanged();
             }
         }
@@ -335,6 +300,8 @@
         finally
         {
             isGeneratingReport = false;
+            // One final UI update to re-enable buttons, stop spinners, etc.
+            StateHasChanged();
         }
     }
 

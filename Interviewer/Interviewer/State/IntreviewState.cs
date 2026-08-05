@@ -1,4 +1,4 @@
-﻿using Interviewer.Data.Models;
+﻿using Interviewer.Contracts.Models;
 
 namespace Interviewer.State;
 

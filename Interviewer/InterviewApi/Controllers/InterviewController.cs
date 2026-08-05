@@ -1,8 +1,7 @@
-﻿using Interviewer.Api.Requests;
-using Interviewer.Data.Interfaces;
-using Interviewer.Data.Models;
+﻿using Interviewer.Contracts.Models;
+using Interviewer.Contracts.Requests;
 using Interviewer.Services;
-using Microsoft.AspNetCore.Http;
+using Interviewer.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Interviewer.Api.Controllers;
@@ -12,12 +11,12 @@ namespace Interviewer.Api.Controllers;
 [Produces("application/json")]
 public class InterviewsController : ControllerBase
 {
-    private readonly IInterviewRepository _repository;
+    private readonly IInterviewService _interviewService;
     private readonly IInterviewGeneratorService _interviewGeneratorService;
 
-    public InterviewsController(IInterviewRepository repository, IInterviewGeneratorService interviewGeneratorService)
+    public InterviewsController(IInterviewService interviewService, IInterviewGeneratorService interviewGeneratorService)
     {
-        _repository = repository;
+        _interviewService = interviewService;
         _interviewGeneratorService = interviewGeneratorService;
     }
 
@@ -26,7 +25,7 @@ public class InterviewsController : ControllerBase
     [ProducesResponseType(typeof(List<Interview>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll()
     {
-        var interviews = await _repository.GetAllAsync();
+        var interviews = await _interviewService.GetAllAsync();
         return Ok(interviews);
     }
 
@@ -36,7 +35,7 @@ public class InterviewsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(string id)
     {
-        var interview = await _repository.GetByIdAsync(id);
+        var interview = await _interviewService.GetByIdAsync(id);
 
         if (interview is null)
             return NotFound(new { message = $"Interview with id '{id}' not found." });
@@ -58,7 +57,7 @@ public class InterviewsController : ControllerBase
         // with a duplicate key error. Assign the id server-side (same Guid strategy as the Blazor host) so a
         // caller also cannot overwrite an existing document via POST.
         interview.Id = Guid.NewGuid().ToString();
-        await _repository.CreateAsync(interview);
+        await _interviewService.CreateAsync(interview);
 
         return CreatedAtAction(nameof(GetById), new { id = interview.Id }, interview);
     }
@@ -74,13 +73,13 @@ public class InterviewsController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        var existing = await _repository.GetByIdAsync(id);
+        var existing = await _interviewService.GetByIdAsync(id);
 
         if (existing is null)
             return NotFound(new { message = $"Interview with id '{id}' not found." });
 
         updatedInterview.Id = id;
-        await _repository.UpdateAsync(id, updatedInterview);
+        await _interviewService.UpdateAsync(id, updatedInterview);
 
         return NoContent();
     }
@@ -92,12 +91,12 @@ public class InterviewsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(string id)
     {
-        var existing = await _repository.GetByIdAsync(id);
+        var existing = await _interviewService.GetByIdAsync(id);
 
         if (existing is null)
             return NotFound(new { message = $"Interview with id '{id}' not found." });
 
-        await _repository.DeleteAsync(id);
+        await _interviewService.DeleteAsync(id);
 
         return NoContent();
     }

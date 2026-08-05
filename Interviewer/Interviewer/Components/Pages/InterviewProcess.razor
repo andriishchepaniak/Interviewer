@@ -1,11 +1,11 @@
 ﻿@page "/interview/{Id}"
-@using Interviewer.Data.Interfaces
-@using Interviewer.Data.Models
 @using Interviewer.State
+@using Interviewer.Clients
+@using Interviewer.Contracts.Models
 @inject NavigationManager Nav
 @rendermode InteractiveServer
 @inject InterviewState State
-@inject IInterviewRepository Repository
+@inject InterviewClientService InterviewClient
 
 <div class="flex flex-col h-screen bg-gray-50">
     <header class="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center shadow-sm z-20">
@@ -172,7 +172,7 @@
     {
         if (!string.IsNullOrEmpty(Id) && State.Current.Id != Id)
         {
-            var interviewFromDb = await Repository.GetByIdAsync(Id);
+            var interviewFromDb = await InterviewClient.GetByIdAsync(Id);
             if (interviewFromDb == null)
             {
                 Nav.NavigateTo("/");
@@ -210,12 +210,12 @@
     {
         q.Score = (q.Score == score) ? null : score;
 
-        await Repository.UpdateAsync(State.Current.Id, State.Current);
+        await InterviewClient.UpdateAsync(State.Current.Id, State.Current);
     }
 
     async Task SaveChanges()
     {
-        await Repository.UpdateAsync(State.Current.Id, State.Current);
+        await InterviewClient.UpdateAsync(State.Current.Id, State.Current);
     }
 
     string GetScoreLabel(int score) => score switch { 0 => "Wrong (0)", 1 => "Weak (1)", 2 => "Good (2)", 3 => "Excellent (3)", _ => "" };

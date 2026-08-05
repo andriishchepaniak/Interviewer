@@ -1,10 +1,10 @@
 ﻿@page "/"
-@using Interviewer.Data.Interfaces
-@using Interviewer.Data.Models
-@using Interviewer.Data.Repositories
+@using Interviewer.Contracts.Models
+@using Interviewer.Clients
+
 @rendermode InteractiveServer
-@inject IInterviewRepository Repository
 @inject NavigationManager Nav
+@inject InterviewClientService InterviewClient
 
 <div class="max-w-5xl mx-auto pt-10 px-6 pb-24">
 
@@ -108,7 +108,7 @@
     {
         try
         {
-            var data = await Repository.GetAllAsync();
+            var data = await InterviewClient.GetAllAsync();
             // Сортуємо від найновіших до найстаріших
             interviews = data
                 .OrderByDescending(x => x.CreatedAt)

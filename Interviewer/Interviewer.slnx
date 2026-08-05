@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="Contracts/Interviewer.Contracts.csproj" Id="36a5bed4-7623-4a39-832c-6cf2d5c75691" />
   <Project Path="InterviewApi/Interviewer.Api.csproj" Id="e9fba13d-4ec3-48f6-8b6c-9bbff44d03b2" />
   <Project Path="Interviewer.Data/Interviewer.Data.csproj" Id="51245226-e777-4430-82e0-58935f820bdd" />
   <Project Path="Interviewer.Infrastructure/Interviewer.Infrastructure.csproj" Id="0a34477f-f243-40f2-bcb8-45b74e5646b5" />
