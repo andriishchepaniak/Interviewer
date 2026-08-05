@@ -39,6 +39,7 @@ jobs:
       run: dotnet publish ./Interviewer/Interviewer/Interviewer.csproj --no-build --configuration Release --output ./publish
 
     - name: Deploy to Azure Web App
+      if: github.ref == 'refs/heads/main'
       uses: azure/webapps-deploy@v3
       with:
         app-name: 'interviewer-app-dev'
