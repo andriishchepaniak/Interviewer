@@ -6,7 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHttpClient("InterviewApi", client =>
 {
-    client.BaseAddress = new Uri("https://localhost:7254/");
+    client.BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? string.Empty);
 });
 
 builder.Services.AddScoped<InterviewClientService>();
